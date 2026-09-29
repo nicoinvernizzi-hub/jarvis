@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="es" data-tema="matrix">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cdn.jsdelivr.net wss://*.livekit.cloud https://*.livekit.cloud; img-src 'self' data:; media-src 'self' blob: mediastream:; worker-src 'self' blob:; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="Consola de voz personal">
+<title>J.A.R.V.I.S.</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #000; --panel: rgba(0, 16, 5, .82); --acc: 0, 255, 65; --line: rgba(var(--acc), .22); --line-strong: rgba(var(--acc), .55);
+    --text: #c8ffd2; --muted: #4c8a58; --cyan: #00ff41; --green: #c6ff5e; --amber: #ffb300; --red: #ff3d5a;
+    --state: var(--cyan); --mono: ui-monospace, "Roboto Mono", "Droid Sans Mono", Consolas, monospace;
+  }
+  body.dormido { --state: #2f5f38; }
+  body.tu { --state: var(--green); }
+  body.pensando { --state: var(--amber); }
+  body.hablando { --state: var(--cyan); }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; min-height: 100dvh; color: var(--text); font: 14px/1.45 var(--mono); overflow-x: hidden;
+    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 16px);
+    background:
+      radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--state) 22%, transparent), transparent 60%),
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(var(--acc),.05) 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(var(--acc),.05) 39px 40px),
+      var(--bg);
+    transition: background .6s; position: relative; z-index: 0;
+  }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none;
+                background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px); }
+  #rain { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .16; }
+  main { max-width: 560px; margin: 0 auto; }
+
+  header { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 16px 4px; }
+  .nucleo { width: min(72vw, 300px); aspect-ratio: 1; display: block; color: var(--state); transition: color .6s; }
+  h1 { margin: -4px 0 0; font: 600 20px var(--mono); letter-spacing: .3em; color: var(--state); text-shadow: 0 0 12px var(--state); }
+  #estado { font: 600 13px var(--mono); letter-spacing: .12em; text-transform: uppercase; margin-top: 2px; }
+  .meta { font: 11px var(--mono); color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+  .meta b { color: var(--text); font-weight: normal; }
+
+  .hud { position: relative; background: var(--panel); border: 1px solid var(--line);
+         clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); }
+  .hud::before { content: ""; position: absolute; top: 0; left: 0; width: 34px; height: 34px;
+                 border-top: 2px solid var(--cyan); border-left: 2px solid var(--cyan); clip-path: inherit; opacity: .8; }
+  section { margin: 0 16px 14px; }
+  h2 { display: flex; align-items: center; gap: 8px; margin: 14px 0 7px; font: 600 11px var(--mono);
+       letter-spacing: .28em; color: var(--cyan); text-transform: uppercase; }
+  h2::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-strong), transparent); }
+
+  .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px 16px 2px; }
+  button.hud { color: var(--text); font: 600 13px var(--mono); letter-spacing: .06em; text-align: left;
+               padding: 14px 12px; cursor: pointer; min-height: 60px; transition: border-color .2s, box-shadow .2s; }
+  button.hud:active { border-color: var(--cyan); box-shadow: inset 0 0 18px rgba(var(--acc),.25); }
+  button.hud small { display: block; margin-top: 2px; font: 10px var(--mono); color: var(--muted); letter-spacing: 0; }
+  button.hud.on { border-color: var(--green); box-shadow: inset 0 0 16px color-mix(in srgb, var(--green) 18%, transparent); }
+  button.hud.warn { border-color: var(--red); box-shadow: inset 0 0 16px rgba(255,61,90,.2); }
+  button.hud.big { grid-column: 1 / -1; text-align: center; font-size: 16px; letter-spacing: .2em; }
+  .controls button.hud:not(.big) { font-size: 12px; padding: 12px 9px; min-width: 0; }
+  .controls button.hud small { overflow-wrap: anywhere; }
+  button.hud:disabled { opacity: .45; }
+
+  .agents { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .agent:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .agent { padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .agent .top { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .hex { width: 32px; height: 32px; display: grid; place-items: center; font-size: 16px; flex: none;
+         background: rgba(var(--acc),.1); clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
+  .agent .name { font: 600 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
+  .badge { font: 9px var(--mono); letter-spacing: .1em; color: var(--muted); }
+  .led { width: 9px; height: 9px; border-radius: 50%; margin-left: auto; background: #1d3a24; flex: none; }
+  .agent.work .led { background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: blink 1s infinite; }
+  .agent.work { border-color: rgba(255,179,0,.55); }
+  @keyframes blink { 50% { opacity: .35; } }
+  .agent .status { font: 10px var(--mono); letter-spacing: .14em; color: var(--muted); }
+  .agent.work .status { color: var(--amber); }
+  .agent .job { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .agent .step { font: 11px var(--mono); color: var(--cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent .step::before { content: "▸ "; }
+  .agent .rol { font-size: 11px; color: var(--muted); }
+  .bar { height: 3px; background: rgba(var(--acc),.1); overflow: hidden; margin-top: auto; }
+  .agent.work .bar::after { content: ""; display: block; width: 40%; height: 100%;
+                            background: linear-gradient(90deg, transparent, var(--amber), transparent); animation: scan 1.4s linear infinite; }
+  @keyframes scan { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  .agent .foot { font: 10px var(--mono); color: var(--muted); }
+
+  .box { padding: 10px 12px; max-height: 300px; overflow-y: auto; }
+  .line { font-size: 13px; padding: 4px 0; overflow-wrap: anywhere; }
+  .who { font: 600 10px var(--mono); letter-spacing: .15em; margin-right: 6px; }
+  .user .who { color: var(--green); } .assistant .who { color: var(--cyan); }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 6px 0;
+         border-bottom: 1px dashed var(--line); font-size: 12px; overflow-wrap: anywhere; }
+  .row:last-child { border-bottom: 0; }
+  .tag { font: 9px var(--mono); letter-spacing: .12em; text-transform: uppercase; padding: 1px 6px; border: 1px solid currentColor; white-space: nowrap; }
+  .tag.hecha { color: var(--green); } .tag.en_curso, .tag.pendiente { color: var(--amber); }
+  .tag.error, .tag.interrumpida { color: var(--red); }
+  .muted { color: var(--muted); }
+  .empty { color: var(--muted); font: 11px var(--mono); padding: 2px 0; }
+  #aviso { display: none; position: sticky; top: 0; z-index: 2; background: var(--red); color: #fff;
+           text-align: center; padding: 6px 10px; font: 11px var(--mono); letter-spacing: .08em; }
+
+  /* Pantalla de enlace: cuando el celular todavía no tiene pase (o venció) */
+  #enlace { display: none; margin: 8px 16px; padding: 16px; }
+  body.sin-pase #enlace { display: block; }
+  body.sin-pase .con-pase { display: none; }
+  #enlace p { margin: 0 0 10px; font-size: 13px; }
+  #enlace textarea { width: 100%; min-height: 70px; background: #000; color: var(--text); border: 1px solid var(--line-strong);
+                     font: 12px var(--mono); padding: 8px; resize: vertical; }
+  #enlace .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .enlaces { display: grid; gap: 8px; }
+  a.hud { display: block; color: var(--text); text-decoration: none; padding: 14px 12px; font: 600 13px var(--mono);
+          letter-spacing: .06em; border-color: var(--green); box-shadow: inset 0 0 16px color-mix(in srgb, var(--green) 18%, transparent); }
+  a.hud small { display: block; margin-top: 2px; font: 10px var(--mono); color: var(--muted); letter-spacing: 0; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body class="dormido">
+<canvas id="rain" aria-hidden="true"></canvas>
+<div id="aviso" role="status"></div>
+<main>
+  <header>
+    <canvas class="nucleo" id="nucleo" aria-hidden="true"></canvas>
+    <h1>J.A.R.V.I.S.</h1>
+    <div id="estado">Desconectado</div>
+    <div class="meta" id="meta"></div>
+  </header>
+
+  <div id="enlace" class="hud">
+    <p><b>Vincula este celular.</b> En la PC corre <span class="muted">scripts\enlace_celular.py</span> y escanea el QR,
+       o pega aquí el enlace completo.</p>
+    <textarea id="pegado" placeholder="https://…#u=wss://…&amp;t=…" autocomplete="off" spellcheck="false"></textarea>
+    <div class="fila">
+      <button class="hud" id="b-portapapeles">⧉ PEGAR<small>desde el portapapeles</small></button>
+      <button class="hud" id="b-guardar">✓ VINCULAR<small>guardar el pase aquí</small></button>
+    </div>
+  </div>
+
+  <div class="controls con-pase">
+    <button class="hud big" id="b-conectar">● CONECTAR</button>
+    <button class="hud" id="b-micro" disabled>🎙 MICRÓFONO<small>abierto</small></button>
+    <button class="hud" id="b-altavoz" disabled>🔊 VOZ<small>se escucha</small></button>
+    <button class="hud" id="b-pantalla">☾ PANTALLA<small>se apaga; JARVIS sigue</small></button>
+  </div>
+
+  <section class="con-pase" id="sec-enlaces" hidden><h2>Accesos</h2><div id="enlaces" class="enlaces"></div></section>
+  <section class="con-pase"><h2>Especialistas</h2><div class="agents" id="agentes"><div class="empty">// conéctate para ver al equipo</div></div></section>
+  <section class="con-pase"><h2>Enlace de voz</h2><div class="hud box" id="chat"><div class="empty">// sin transmisiones</div></div></section>
+  <section class="con-pase"><h2>Registro de tareas</h2><div class="hud box" id="tareas"><div class="empty">// sin datos todavía</div></div></section>
+  <section class="con-pase"><h2>Sistema</h2><div class="hud box" id="sistema"></div></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"
+        integrity="sha384-MveBYLjjZe2VXnKzvBbPfyh5MEbiqNDeta9nzIGbtqnXmC+CwX/mLE5+M9PDIcPy" crossorigin="anonymous"></script>
+<script src="app.js"></script>
+</body>
+</html>
