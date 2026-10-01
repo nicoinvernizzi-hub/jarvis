@@ -104,6 +104,7 @@ function paso(p) {
     case "planear": return p.subpreguntas ? `Plan: ${p.subpreguntas} subpreguntas` : "Planeando";
     case "buscar_foto": return `Buscando foto «${p.consulta || ""}»`;
     case "elegir_foto": return p.elegida ? "Foto elegida" : "Diseño tipográfico";
+    case "reintentar": return `Google saturado · reintento en ${Math.round((p.en_s || 150) / 60 * 10) / 10} min`;
     case "verificar": return `Revisando ${p.area}${p.problemas ? ` · ${p.problemas} hallazgo(s)` : " · en orden"}`;
     default: return p.accion || p.paso || "Trabajando";
   }
