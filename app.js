@@ -7,7 +7,7 @@
 const $ = (id) => document.getElementById(id);
 const LK = window.LivekitClient;
 const PASE = "jarvis.pase";
-const OFICIO = {investigador: "INVESTIGADOR", redactor: "REDACTOR", disenadora: "DISEÑADORA", seguridad: "SEGURIDAD"};
+const OFICIO = {investigador: "INVESTIGADOR", redactor: "REDACTOR", disenadora: "DISEÑADORA", seguridad: "SEGURIDAD", ingeniero: "INGENIERO", finanzas: "FINANZAS"};
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
 let room = null, estado = null, turnos = [], agenteVoz = "desconectado", yoHablo = false, conectando = false;
@@ -134,6 +134,8 @@ function render() {
   $("b-micro").disabled = $("b-altavoz").disabled = !room;
   pon("b-pantalla", "innerHTML", pantallaFija ? "☀ PANTALLA<small>siempre encendida</small>" : "☾ PANTALLA<small>se apaga; JARVIS sigue</small>");
   pon("b-pantalla", "className", "hud" + (pantallaFija ? " on" : ""));
+  pon("b-ubicacion", "innerHTML", ubicacionOn ? "📍 UBICACIÓN<small>JARVIS la ve al preguntarle</small>" : "📍 UBICACIÓN<small>no compartida</small>");
+  pon("b-ubicacion", "className", "hud" + (ubicacionOn ? " on" : ""));
   sesionMultimedia();
   const micOn = room ? room.localParticipant.isMicrophoneEnabled : false;
   pon("b-micro", "innerHTML", micOn ? "🎙 MICRÓFONO<small>abierto · toca para silenciar</small>" : "🔇 MICRÓFONO<small>silenciado</small>");
@@ -229,6 +231,7 @@ async function conectar(automatico = false) {
       if (topic === "jarvis.estado") estado = d;
       else if (topic === "jarvis.turno") { turnos.push(d); turnos = turnos.slice(-40); }
       else if (topic === "jarvis.enlace") nuevoEnlace(d);
+      else if (topic === "jarvis.ubicacion.pedir") responderUbicacion(r);
       render();
     } catch {}
   });
@@ -317,7 +320,9 @@ async function activarMicro(r) {
 }
 
 function pedirEstado(r) {
-  r.localParticipant.publishData(new TextEncoder().encode("{}"), {reliable: true, topic: "jarvis.pedir"}).catch(() => {});
+  // Con el pedido va qué sabe hacer esta versión de la app (así JARVIS no espera en vano una ubicación)
+  const yo = JSON.stringify({version: 6, ubicacion: ubicacionOn ? "activada" : "apagada"});
+  r.localParticipant.publishData(new TextEncoder().encode(yo), {reliable: true, topic: "jarvis.pedir"}).catch(() => {});
 }
 
 function colgar() {
@@ -343,6 +348,20 @@ function oirJarvis(track) {
 }
 
 // Pantalla: por defecto se apaga sola como siempre (la llamada sigue); "fija" la mantiene encendida.
+// Ubicación: solo si Nico la activa. JARVIS la pide al momento ("¿dónde estoy?"); no hay rastreo continuo.
+let ubicacionOn = false;
+try { ubicacionOn = localStorage.getItem("jarvis.ubicacion") === "si"; } catch {}
+function responderUbicacion(r) {
+  const enviar = (d) => r.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(d)),
+                                                        {reliable: true, topic: "jarvis.ubicacion"}).catch(() => {});
+  if (!ubicacionOn) return enviar({error: "apagada"});
+  if (!navigator.geolocation) return enviar({error: "sin_gps"});
+  navigator.geolocation.getCurrentPosition(
+    (p) => enviar({lat: p.coords.latitude, lon: p.coords.longitude, precision: Math.round(p.coords.accuracy), t: p.timestamp / 1000}),
+    (e) => enviar({error: e.code === 1 ? "permiso" : e.code === 3 ? "tiempo" : "sin_senal"}),
+    {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000});
+}
+
 let pantallaFija = false;
 try { pantallaFija = localStorage.getItem("jarvis.pantalla") === "fija"; } catch {}
 async function mantenerPantalla() {
@@ -482,6 +501,17 @@ function lluvia() {
 // ---------- Arranque ----------
 
 $("b-conectar").onclick = () => (room || quiero ? colgar() : conectar());
+$("b-ubicacion").onclick = () => {
+  ubicacionOn = !ubicacionOn;
+  try { localStorage.setItem("jarvis.ubicacion", ubicacionOn ? "si" : "no"); } catch {}
+  if (room) pedirEstado(room); // JARVIS se entera al momento de si la activaste o la apagaste
+  if (ubicacionOn && navigator.geolocation) // pide el permiso ahora, con tu toque (el navegador lo exige así)
+    navigator.geolocation.getCurrentPosition(() => aviso(""), (e) => {
+      if (e.code === 1) { ubicacionOn = false; try { localStorage.setItem("jarvis.ubicacion", "no"); } catch {}
+                          aviso("El navegador no dio permiso de ubicación: actívalo en los ajustes del sitio."); render(); }
+    }, {enableHighAccuracy: true, timeout: 15000});
+  render();
+};
 $("b-pantalla").onclick = () => {
   pantallaFija = !pantallaFija;
   try { localStorage.setItem("jarvis.pantalla", pantallaFija ? "fija" : "normal"); } catch {}

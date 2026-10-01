@@ -1,7 +1,7 @@
 // Service worker: guarda la app para que abra al instante y se pueda instalar.
 // Solo cachea los archivos de la app y la librería de voz; nunca la conversación ni el pase.
-const CACHE = "jarvis-v4";
-const APP = ["./", "index.html", "privacidad.html", "app.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png",
+const CACHE = "jarvis-v6";
+const APP = ["./", "index.html", "privacidad.html", "condiciones.html", "app.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png",
              "https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"];
 
 self.addEventListener("install", (e) => {
