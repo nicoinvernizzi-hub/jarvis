@@ -271,7 +271,7 @@ async function conectar(automatico = false) {
       }
       sinJarvis = 0;
       colgar();
-      aviso("JARVIS no respondió. ¿Está encendida la PC? Vuelve a intentar en unos segundos.");
+      aviso("Ninguna computadora respondió: enciende JARVIS en la PC o en la Mac y vuelve a intentar.");
     }, 15000);
     if (micDeseado) await activarMicro(r);
   } catch (e) {
